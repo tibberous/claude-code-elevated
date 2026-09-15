@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+# transient elevation queue + heartbeat (runtime state, never committed)
+_sysfix.ps1
+logs/
+# house standard
+.env
+config.ini
+*.db
+*.sqlite*
+.claude/
+CLAUDE.md
