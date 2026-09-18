@@ -94,14 +94,32 @@ def _norm_commands(commands, sep=None):
 
 
 def _task_state():
-    """'installed' | 'absent' | 'unknown'. A SYSTEM task is unreadable by a non-admin query,
-    so 'Access is denied' means it EXISTS; 'cannot find' means it's not there."""
+    """'installed' | 'absent' | 'unknown' - CHECKS BOTH INSTALL MODES.
+
+    >>> FIXED 2026-09-18. This used to query ONLY `schtasks`, so it reported "absent" for a
+    runner that was installed and RUNNING the whole time - because bootstrap.ps1 offers
+    `-Mode task|service` and this machine took the SERVICE. A status check that reports a
+    working system as missing is worse than no status check: on 2026-09-18 it led to telling
+    Trent that elevation needed a UAC prompt when `run_elevated.py "whoami"` was already
+    returning `nt authority\\system`. Check the service FIRST - it is the installed shape here. <<<
+    """
+    rc, out = _ps(["-Command",
+                   "(Get-Service -Name 'AdminHookRunner' -ErrorAction SilentlyContinue).Status"])
+    if "running" in out.lower():
+        return "installed (service)"
+
     rc, out = _ps(["-Command", f'schtasks /Query /TN "{TASK}" 2>&1'])
     low = out.lower()
-    if "cannot find" in low or "does not exist" in low:
-        return "absent"
     if "access is denied" in low or TASK.lower() in low:
-        return "installed"
+        return "installed (task)"
+    if "cannot find" in low or "does not exist" in low:
+        # The other two sisters (Daemon Manager, Relay) live under \Monitor\, so a task-mode
+        # install may still be sitting in the old folder. Look there before declaring absence.
+        rc, out = _ps(["-Command", 'schtasks /Query /TN "\\Monitor\\AdminHookRunner" 2>&1'])
+        low2 = out.lower()
+        if "access is denied" in low2 or "adminhookrunner" in low2:
+            return "installed (task, legacy \\Monitor\\ folder)"
+        return "absent"
     return "unknown"
 
 
