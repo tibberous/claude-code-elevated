@@ -1,11 +1,20 @@
 #!/usr/bin/env python3
 r"""run_elevated.py - run shell commands elevated (as NT AUTHORITY\SYSTEM) with no UAC each time.
 
-Wraps the SYSTEM command queue (built in C:\monitor + C:\hooks): you drop commands into
-C:\admin_commands.ps1, the `AdminCommandQueue` scheduled task (SYSTEM, /RL HIGHEST, every
-minute, hidden in session 0) runs each one via Invoke-Expression and writes the result to
-C:\admin_commands.log, then blanks the queue. This hook writes the queue, waits for the task
-to consume it, parses the log, and hands back per-command {command, output, exit_code}.
+Wraps the SYSTEM command queue, which lives ENTIRELY under C:\services\admin-hook-runner:
+you drop commands into `_sysfix.ps1`, the `\Services\AdminHookRunner` scheduled task (SYSTEM,
+/RL HIGHEST, every minute, hidden in session 0) runs each one via Invoke-Expression and writes
+the result to `logs\run_elevated_result.log`, then blanks the queue. This hook writes the queue,
+waits for the task to consume it, parses the log, and hands back per-command
+{command, output, exit_code}.
+
+>>> CORRECTED 2026-09-18. This paragraph used to say the queue was "built in C:\monitor +
+C:\hooks", with the queue at C:\admin_commands.ps1, the log at C:\admin_commands.log and the
+task called `AdminCommandQueue`. **Every one of those was wrong**, and C:\monitor has since been
+DELETED, so a reader following this docstring went looking in a directory that does not exist.
+The constants below were repointed to C:\services on 2026-09-14; this prose was not. Trent,
+2026-09-18: *"c:/moniter is deleted now. look in c:/services"*. The task folder was renamed
+\Monitor\ -> \Services\ at the same time, which was free because the task was not registered. <<<
 
 Because the runner is SYSTEM, queued commands inherit full privileges (registry seizes,
 protected-path edits, service installs, killing protected processes, etc.). The only popup is
@@ -44,8 +53,13 @@ SYSFIX = r"C:\services\admin-hook-runner\_sysfix.ps1"  # one-shot script the SYS
 LOG = r"C:\services\admin-hook-runner\logs\run_elevated_result.log"  # our generated script writes results here
 QUEUE = SYSFIX                            # back-compat alias (status() reports pending = file exists)
 POLLER = r"C:\services\admin-hook-runner\admin_hook_runner.py"  # the script the SYSTEM task actually runs
-REG_SCRIPT = r"C:\services\admin-hook-runner\install.ps1"  # elevated (re)registration of the #2 task
-TASK = r"\Monitor\AdminHookRunner"       # the live SYSTEM scheduled task name (full path)
+# install.ps1 DOES NOT EXIST - the installer is bootstrap.ps1 (corrected 2026-09-18).
+REG_SCRIPT = r"C:\services\admin-hook-runner\bootstrap.ps1"  # elevated (re)registration; -Mode task
+# Task Scheduler FOLDER, not a filesystem path - but it was named after C:\monitor, which is now
+# deleted. Renamed \Monitor\ -> \Services\ on 2026-09-18 to match where the code actually lives.
+# MUST stay in step with $TaskPath in bootstrap.ps1 - if they disagree, status() reports "absent"
+# for a task that is registered, which is the confusing failure this comment exists to prevent.
+TASK = r"\Services\AdminHookRunner"      # the live SYSTEM scheduled task name (full path)
 
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 

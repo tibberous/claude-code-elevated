@@ -25,7 +25,10 @@ $ErrorActionPreference = 'Stop'
 $Dest     = 'C:\services\admin-hook-runner'
 $Runner   = "$Dest\admin_hook_runner.ps1"
 $TaskName = 'AdminHookRunner'
-$TaskPath = '\Monitor\'
+# Task Scheduler folder. Renamed \Monitor\ -> \Services\ on 2026-09-18: it was named after
+# C:\monitor, which has been DELETED, and everything now lives under C:\services.
+# MUST stay in step with TASK in run_elevated.py.
+$TaskPath = '\Services\'
 $SvcName  = 'AdminHookRunner'
 
 function Test-Admin {

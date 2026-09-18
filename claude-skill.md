@@ -34,7 +34,7 @@ a whole pipeline as ONE command.
 ## The mechanism (so you trust it)
 
 `run_elevated.py` is a client. It writes a one-shot `_sysfix.ps1` into a queue folder; a runner
-registered to run as **SYSTEM** (`\Monitor\AdminHookRunner`, a scheduled task, or an
+registered to run as **SYSTEM** (`\Services\AdminHookRunner`, a scheduled task, or an
 NSSM service) executes it and deletes it, appending results to a log the client reads back.
 The runner + installer live at **`C:\services\admin-hook-runner\`** (its own repo).
 
