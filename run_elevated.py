@@ -43,15 +43,24 @@ import subprocess
 import sys
 import time
 
-# Live channel (2026-06-16): the SYSTEM AdminHookRunner task runs C:\home\admin_hook_runner.py
-# every ~60s, which executes a one-shot C:\home\_sysfix.ps1 (as SYSTEM) and then DELETES it.
-# We drop a generated _sysfix.ps1 that runs each command and appends results to RESULT_LOG in
-# the legacy [cmd]/output/>> Exited with code N format, so _parse_log() still works.
-# Repointed 2026-09-14 from #1 (C:\home\admin_hook_runner.py) to #2 (C:\services\admin-hook-runner).
-# #2 is the clean elevation-only primitive; #1 is being torn down. Same contract, new location.
-SYSFIX = r"C:\services\admin-hook-runner\_sysfix.ps1"  # one-shot script the SYSTEM runner executes + deletes
-LOG = r"C:\services\admin-hook-runner\logs\run_elevated_result.log"  # our generated script writes results here
-QUEUE = SYSFIX                            # back-compat alias (status() reports pending = file exists)
+# THE LIVE CHANNEL. The AdminHookRunner WINDOWS SERVICE (NSSM, SYSTEM) runs
+# admin_hook_runner.ps1 -Loop with a ~3s tick. Each tick: if the queue file has CONTENT, execute
+# it as SYSTEM, then BLANK it. We drop a generated script that runs each command and appends
+# results to LOG in the [cmd]/output/>> Exited with code N format, so _parse_log() still works.
+#
+# >>> THE PATHS BELOW ARE THE ONES THAT ARE TRUE. Two comments here used to say the queue lived
+# at C:\home\_sysfix.ps1 - that was the PRE-2026-09-14 location and it had been stale ever since.
+# Repointed 2026-09-14 from C:\home\admin_hook_runner.py to C:\services\admin-hook-runner\: same
+# contract, new home, and C:\home's copy was torn down. Corrected 2026-09-20 after the stale
+# comment sent a reader to a folder that has not held the queue in six days. <<<
+#
+# BLANKED, NOT DELETED (2026-09-20, restoring Trent's original design): the queue file ALWAYS
+# EXISTS so a human can browse to it, open it, type a command and save. Deleting it meant you had
+# to CREATE it from memory - exact name, exact folder - i.e. you had to already know everything.
+SYSFIX = r"C:\services\admin-hook-runner\_sysfix.ps1"  # the queue. SYSTEM runs it, then BLANKS it.
+LOG = r"C:\services\admin-hook-runner\logs\run_elevated_result.log"  # results land here
+QUEUE = SYSFIX     # alias. status() reports pending = the file has NON-EMPTY CONTENT (not "exists":
+                   # with blanking, "exists" is true forever and would report pending permanently).
 POLLER = r"C:\services\admin-hook-runner\admin_hook_runner.py"  # the script the SYSTEM task actually runs
 # install.ps1 DOES NOT EXIST - the installer is bootstrap.ps1 (corrected 2026-09-18).
 REG_SCRIPT = r"C:\services\admin-hook-runner\bootstrap.ps1"  # elevated (re)registration; -Mode task

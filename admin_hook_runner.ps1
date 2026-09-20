@@ -21,13 +21,31 @@ $Base      = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Queue     = Join-Path $Base '_sysfix.ps1'
 $Heartbeat = Join-Path $Base 'logs\heartbeat.txt'
 
+# >>> THE QUEUE IS BLANKED, NEVER DELETED. (Trent's original design, restored 2026-09-20.) <<<
+#
+# It had drifted to Remove-Item, and that is ALMOST the same and quietly worse:
+#   BLANK  - the file is ALWAYS THERE. Browse to the folder, double-click it, type a command,
+#            save. It is a drop box you can find.
+#   DELETE - the file is absent ~100% of the time. To use it by hand you must CREATE it, with
+#            the exact name, in the exact folder, with the right encoding - i.e. you must already
+#            know everything. Trent went looking for _sysfix.ps1 on 2026-09-20 and got
+#            "File not found", which is the whole argument.
+#
+# AND THE WEDGE INDICATOR GETS BETTER, not worse. Before: "file exists" meant stuck. Now:
+# NON-EMPTY CONTENT means stuck - and you can READ THE COMMAND that is stuck, instead of only
+# knowing that something is.
+#
+# COUPLED CHANGE, or this breaks silently: run_elevated.py defined pending as "file EXISTS".
+# With blanking that is true forever. It must test for non-empty. Changed in the same commit.
 function Invoke-Drain {
   $ran = $false
-  if (Test-Path $Queue) {
+  # non-empty, not merely present - an empty queue file is the RESTING state now
+  if ((Test-Path $Queue) -and ((Get-Item $Queue).Length -gt 0)) {
     try {
       & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $Queue | Out-Null
     } finally {
-      Remove-Item $Queue -Force -ErrorAction SilentlyContinue
+      # blank it in place; the file survives so a human can always find and use it
+      Set-Content -Path $Queue -Value '' -Encoding utf8 -ErrorAction SilentlyContinue
     }
     $ran = $true
   }
