@@ -128,8 +128,9 @@ function Show-Menu {
   Write-Host ""
   Write-Host "  AdminHookRunner - SYSTEM elevation channel installer" -ForegroundColor Cyan
   Write-Host "  ----------------------------------------------------"
-  Write-Host "   1) Install as a SCHEDULED TASK   (recommended - runs SYSTEM every 60s, no deps)"
+  Write-Host "   1) Install as a SCHEDULED TASK   (simplest - runs SYSTEM every 60s, no deps)"
   Write-Host "   2) Install as a WINDOWS SERVICE  (instant-ish, ~3s; needs NSSM)"
+  Write-Host "      >> REQUIRED if you also run AdminHookPlunger: it restarts the runner BY SERVICE NAME."
   Write-Host "   3) UNINSTALL                     (removes the task and/or service)"
   Write-Host "   Q) Quit"
   Write-Host ""
