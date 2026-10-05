@@ -32,17 +32,18 @@ administrator.*
 The menu:
 
 ```
- 1) Install as a SCHEDULED TASK   (recommended — runs as SYSTEM every 60s, no dependencies)
- 2) Install as a WINDOWS SERVICE  (instant-ish, ~3s latency; needs NSSM)
+ 1) Install as a WINDOWS SERVICE  (RECOMMENDED - ~3s loop, SYSTEM, auto-start; needs NSSM)
+ 2) Install as a SCHEDULED TASK   (fallback only - 60s, and AdminHookPlunger cannot restart it)
  3) UNINSTALL                     (removes the task and/or service)
  Q) Quit
 ```
 
-**Task vs service:** the scheduled task is the recommended default — it's the natural shape for
-a periodic privileged executor, needs nothing extra, and minimal moving parts is a virtue for
-your most-privileged component. Choose the service only if the ~60s task latency bothers you and
-you have [NSSM](https://nssm.cc) installed; it runs `admin_hook_runner.py --loop` and reacts in
-~3s. Both run as SYSTEM.
+**Service vs task: install it as a SERVICE, always.** It reacts in ~3s instead of ~60s, auto-starts as
+SYSTEM, and above all it is what **AdminHookPlunger** expects: the plunger (a separate SYSTEM service on
+127.0.0.1:5052 that unclogs a wedged runner) restarts it with `Restart-Service AdminHookRunner`, so a
+scheduled-task install leaves the plunger nothing to restart. The service runs
+`powershell.exe -File admin_hook_runner.ps1 -Loop -Interval 3` under [NSSM](https://nssm.cc)
+(`winget install NSSM.NSSM`). The scheduled task is kept only as a no-dependency fallback.
 
 ## Uninstall
 
