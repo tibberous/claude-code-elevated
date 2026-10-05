@@ -86,8 +86,8 @@ function Install-Service {
   $nssm = (Get-Command nssm.exe -ErrorAction SilentlyContinue).Source
   if (-not $nssm) {
     Write-Host "  Service mode uses NSSM (a service wrapper) and nssm.exe was not found." -ForegroundColor Yellow
-    Write-Host "  Install it ( winget install NSSM  or  choco install nssm ) and re-run," -ForegroundColor Yellow
-    Write-Host "  or choose the scheduled-task option instead (recommended, no extra deps)." -ForegroundColor Yellow
+    Write-Host "  Install it ( winget install NSSM.NSSM ) and re-run. The SERVICE is the supported install:" -ForegroundColor Yellow
+    Write-Host "  AdminHookPlunger restarts the runner by service name, so a scheduled task leaves it stranded." -ForegroundColor Yellow
     return
   }
   Lay-Files
@@ -128,9 +128,8 @@ function Show-Menu {
   Write-Host ""
   Write-Host "  AdminHookRunner - SYSTEM elevation channel installer" -ForegroundColor Cyan
   Write-Host "  ----------------------------------------------------"
-  Write-Host "   1) Install as a SCHEDULED TASK   (simplest - runs SYSTEM every 60s, no deps)"
-  Write-Host "   2) Install as a WINDOWS SERVICE  (instant-ish, ~3s; needs NSSM)"
-  Write-Host "      >> REQUIRED if you also run AdminHookPlunger: it restarts the runner BY SERVICE NAME."
+  Write-Host "   1) Install as a WINDOWS SERVICE  (RECOMMENDED - ~3s loop, SYSTEM, auto-start; needs NSSM)"
+  Write-Host "   2) Install as a SCHEDULED TASK   (fallback only - 60s, and AdminHookPlunger cannot restart it)"
   Write-Host "   3) UNINSTALL                     (removes the task and/or service)"
   Write-Host "   Q) Quit"
   Write-Host ""
@@ -155,8 +154,8 @@ if (-not (Test-Admin)) {
 try {
   if (-not $Mode) {
     switch (Show-Menu) {
-      '1' { $Mode = 'task' }
-      '2' { $Mode = 'service' }
+      '1' { $Mode = 'service' }
+      '2' { $Mode = 'task' }
       '3' { $Mode = 'uninstall' }
       default { Write-Host "  Bye."; return }
     }
