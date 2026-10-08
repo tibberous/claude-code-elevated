@@ -33,6 +33,7 @@ The menu:
 
 ```
  1) Install as a WINDOWS SERVICE  (RECOMMENDED - ~3s loop, SYSTEM, auto-start; needs NSSM)
+                                  (also installs the AdminHookPlunger :5052 watchdog)
  2) Install as a SCHEDULED TASK   (fallback only - 60s, and AdminHookPlunger cannot restart it)
  3) UNINSTALL                     (removes the task and/or service)
  Q) Quit
@@ -45,11 +46,18 @@ scheduled-task install leaves the plunger nothing to restart. The service runs
 `powershell.exe -File admin_hook_runner.ps1 -Loop -Interval 3` under [NSSM](https://nssm.cc)
 (`winget install NSSM.NSSM`). The scheduled task is kept only as a no-dependency fallback.
 
+**The plunger is bundled.** In service mode the installer also lays down and starts
+**AdminHookPlunger** from [`admin-hook-plunger/`](admin-hook-plunger/) in this repo — a tiny,
+separate SYSTEM service (loopback `:5052`) whose only job is to unclog the runner if a queued
+command ever wedges it. You don't install it separately, and uninstall removes it too. See
+[admin-hook-plunger/README.md](admin-hook-plunger/README.md) for why a watchdog that *can't run
+caller input* is the whole point.
+
 ## Uninstall
 
 Run `bootstrap.ps1` → **3**, or `-Mode uninstall`. It removes the scheduled task and/or the
-service. Files in `C:\services\admin-hook-runner` are left in place; delete the folder to remove
-them too.
+service **and the AdminHookPlunger service**. Files in `C:\services\admin-hook-runner` are left in
+place; delete the folder to remove them too.
 
 ## How the agent uses it
 
@@ -71,6 +79,7 @@ py run_elevated.py status                                # is the channel instal
 | `bootstrap.ps1` | the human installer/uninstaller (menu; self-elevates) |
 | `_sysfix.ps1` | *(runtime)* the queued one-shot; created by the client, deleted by the runner |
 | `logs/heartbeat.txt` | *(runtime)* proves the runner is alive + running as SYSTEM |
+| `admin-hook-plunger/` | the **plunger** — a separate SYSTEM service (`:5052`) that unclogs the runner if a queued command wedges it; installed automatically with the service. See its README. |
 
 ## The runner in Python (our default language)
 

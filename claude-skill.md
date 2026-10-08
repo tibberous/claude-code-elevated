@@ -13,9 +13,9 @@ wall is the TRIGGER to switch tools, not an outcome to announce.
 ## Use it
 
 ```
-C:\python314\pythonw.exe C:\hooks\run_elevated.py "<one command>"
-C:\python314\pythonw.exe C:\hooks\run_elevated.py "cmd one" "cmd two"   # each = its own SYSTEM step
-C:\python314\pythonw.exe C:\hooks\run_elevated.py status                # is the channel installed?
+py C:\services\admin-hook-runner\run_elevated.py "<one command>"
+py C:\services\admin-hook-runner\run_elevated.py "cmd one" "cmd two"   # each = its own SYSTEM step
+py C:\services\admin-hook-runner\run_elevated.py status                # is the channel installed?
 ```
 
 Returns JSON: `{ok, result:[{command, output, exit_code}]}`. The command runs as SYSTEM, so it

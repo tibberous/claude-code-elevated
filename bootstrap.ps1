@@ -2,6 +2,12 @@
   bootstrap.ps1 - installer / uninstaller for the SYSTEM elevation channel. Pure PowerShell,
   no dependencies (the runner is PowerShell too - nothing to install).
 
+  SERVICE install ALSO installs AdminHookPlunger (the watchdog on :5052 that unclogs the
+  runner), laying its files down from the kit if they're not on the box yet. A fresh/bare
+  box that got ONLY the runner would clog on the first long job with nothing to clear it -
+  the two are a pair and install together. (Task-mode install skips it: the plunger restarts
+  the runner by SERVICE name, so it can't rescue a scheduled task anyway.)
+
   THE CATCH-22 THIS SOLVES: the runner registers itself to run as SYSTEM, which itself needs
   admin. An AI agent runs as your normal user and can't clear a UAC prompt - so the FIRST
   install must be done by a human, once. After that the agent has a standing SYSTEM channel
@@ -100,7 +106,41 @@ function Install-Service {
   $s = Get-Service $SvcName -ErrorAction SilentlyContinue
   Write-Host ("  INSTALLED (service): {0}  Status={1}  RunAs=LocalSystem(SYSTEM)  loop@3s" -f `
     $SvcName, $s.Status) -ForegroundColor Green
+  Install-Plunger
   if (-not $SkipTest) { Self-Test }
+}
+
+function Install-Plunger {
+  # AdminHookPlunger is the watchdog (port 5052) that unclogs AdminHookRunner. On a FRESH box
+  # it doesn't exist yet, so lay its files down from wherever this installer shipped, then run
+  # its OWN installer (bootstrap_plunger.ps1 - reused, not reimplemented). nssm is already
+  # present here (Install-Service required it). Without this, a clogged runner can't self-clear.
+  $pDest = 'C:\services\admin-hook-plunger'
+  $cands = @(
+    (Join-Path $PSScriptRoot 'admin-hook-plunger'),             # self-contained kit: plunger vendored as a SUBfolder
+    (Join-Path $PSScriptRoot '..\admin-hook-plunger'),          # sibling: admin-hook-plunger next to admin-hook-runner
+    (Join-Path $PSScriptRoot '..\services\admin-hook-plunger'), # a services\ tree one level up
+    $pDest                                                       # already on the box
+  )
+  $src = $null
+  foreach ($c in $cands) {
+    if ($c -and (Test-Path (Join-Path $c 'bootstrap_plunger.ps1'))) { $src = (Resolve-Path $c).Path; break }
+  }
+  if (-not $src) {
+    Write-Warning "  PLUNGER NOT INSTALLED - its files weren't found beside this installer or in $pDest."
+    Write-Warning "  The runner works, but with no plunger a clogged queue can't self-clear. Ship the"
+    Write-Warning "  admin-hook-plunger\ folder next to this installer (it ships in this repo) and re-run."
+    return
+  }
+  New-Item -ItemType Directory -Force -Path $pDest | Out-Null
+  $pDestResolved = (Resolve-Path $pDest).Path
+  if ($src -ne $pDestResolved) {
+    Write-Host "  Laying down plunger files: $src -> $pDestResolved"
+    Copy-Item "$src\*" $pDestResolved -Recurse -Force
+  }
+  Write-Host "  Installing AdminHookPlunger watchdog (via its own bootstrap_plunger.ps1)..."
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$pDestResolved\bootstrap_plunger.ps1"
+  if ($LASTEXITCODE -ne 0) { Write-Warning "  Plunger installer exit code $LASTEXITCODE - check output above." }
 }
 
 function Uninstall-All {
@@ -114,6 +154,17 @@ function Uninstall-All {
     if ($nssm) { & $nssm stop $SvcName 2>$null | Out-Null; & $nssm remove $SvcName confirm 2>$null | Out-Null }
     else       { sc.exe stop $SvcName | Out-Null; sc.exe delete $SvcName | Out-Null }
     $removed += "service $SvcName"
+  }
+  $pBoot = 'C:\services\admin-hook-plunger\bootstrap_plunger.ps1'
+  if (Get-Service AdminHookPlunger -ErrorAction SilentlyContinue) {
+    if (Test-Path $pBoot) {
+      & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $pBoot -Uninstall | Out-Null
+    } else {
+      $nssm = (Get-Command nssm.exe -ErrorAction SilentlyContinue).Source
+      if ($nssm) { & $nssm stop AdminHookPlunger 2>$null | Out-Null; & $nssm remove AdminHookPlunger confirm 2>$null | Out-Null }
+      else       { sc.exe stop AdminHookPlunger | Out-Null; sc.exe delete AdminHookPlunger | Out-Null }
+    }
+    $removed += "service AdminHookPlunger"
   }
   Remove-Item "$Dest\_sysfix.ps1" -ErrorAction SilentlyContinue
   if ($removed.Count) {
@@ -129,6 +180,7 @@ function Show-Menu {
   Write-Host "  AdminHookRunner - SYSTEM elevation channel installer" -ForegroundColor Cyan
   Write-Host "  ----------------------------------------------------"
   Write-Host "   1) Install as a WINDOWS SERVICE  (RECOMMENDED - ~3s loop, SYSTEM, auto-start; needs NSSM)"
+  Write-Host "                                    (also installs the AdminHookPlunger :5052 watchdog)"
   Write-Host "   2) Install as a SCHEDULED TASK   (fallback only - 60s, and AdminHookPlunger cannot restart it)"
   Write-Host "   3) UNINSTALL                     (removes the task and/or service)"
   Write-Host "   Q) Quit"
